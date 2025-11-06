@@ -1,0 +1,27 @@
+{
+  "name": "hotel-booking-app-backend",
+  "version": "1.0.0",
+  "description": "Hotal booking app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mubeejahir/Luxora-Backend.git"
+  },
+  "author": "Al Mubeena",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mubeejahir/Luxora-Backend/issues"
+  },
+  "homepage": "https://github.com/mubeejahir/Luxora-Backend#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.3",
+    "nodemon": "^3.1.10"
+  }
+}
