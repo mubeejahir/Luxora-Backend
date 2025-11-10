@@ -1,21 +1,21 @@
-const express = require('express');
-const app = express();
-const routes = require('./routes/routes');
+const express = require("express")
+const cors = require('cors')
+const app = express()
+app.use(cors())
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-
-//test route
-// app.get('/', (req, res) => {
-//     res.send('API is running...');
-// });
+const routes = require("./routes/routes")
 
 
-// Use routes
-app.use('/api', routes);
 
 
-// Export the configured Express app. The server is started from `server.js` so
-// the app can be imported by tests without starting the HTTP listener.
-module.exports = app;
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+app.use((req,res,next) => {
+   
+    next();
+})
+
+app.use("/api", routes)
+
+module.exports = app
