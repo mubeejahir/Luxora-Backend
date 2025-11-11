@@ -1,6 +1,7 @@
 const {promisify} = require('util');
 const jwt = require('jsonwebtoken');
 const Guest = require('../models/GuestModel');
+const AdminUser = require('../models/AdminUserModel');
 
 
 const signToken = id =>{
@@ -9,6 +10,51 @@ const signToken = id =>{
         });
 }
 
+//guest cookie 
+const createSendToken = (guest, statusCode, res)=> {
+    const token = signToken(guest._id); 
+const cookieOptions  = {
+    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
+    httpOnly: true,
+}
+if(process.env.NODE_ENV === 'production') cookieOptions.secure = true;
+res.cookie('jwt', token, cookieOptions)
+
+//remove the password from the output
+guest.password = undefined;
+
+res.status(statusCode).json({
+    status: 'success',
+    token,
+    role:"guest",
+    data:guest
+    
+})
+}
+
+//admin cookie
+const createAdminSendToken = (admin, statusCode, res)=> {
+    const token = signToken(admin._id); 
+const cookieOptions  = {
+    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
+    httpOnly: true,
+}
+if(process.env.NODE_ENV === 'production') cookieOptions.secure = true;
+res.cookie('jwt', token, cookieOptions)
+
+//remove the password from the output
+admin.password = undefined;
+
+res.status(statusCode).json({
+    status: 'success',
+    token,
+    role: "admin",
+    data:admin
+    
+})
+}
+
+//GUEST AUTH
 
 //create a new user signup
 exports.registerGuest = async (req, res) => { 
@@ -20,16 +66,17 @@ exports.registerGuest = async (req, res) => {
         }   
         const newGuest = await Guest.create({ fullName, email, phone, password });
         //jwt
-        const token = signToken(newGuest._id);
+        // const token = signToken(newGuest._id);
+        createSendToken(newGuest, 201, res)
        
-        res.status(201).json({ message: 'Guest registered successfully',token, newGuest });
+        // res.status(201).json({ message: 'Guest registered successfully',token, newGuest });
     } catch (err) {
         console.error('registerGuest error:', err);
         res.status(500).json({ message: err.message });
     }       
 };
  
-//login
+//login guest
 exports.loginGuest = async (req,res,next)=>{
     try{
         const { email, password } = req.body;  
@@ -37,18 +84,21 @@ exports.loginGuest = async (req,res,next)=>{
         if(!email || !password){
             return next( new Error("please provide email and password!"))
         }
-
+//         const guests = await Guest.find();
+// console.log("ALL guests:", guests);
         //2.check if user exists && password is correct
         const guest = await Guest.findOne({email}).select('+password');
         // const correct = await guest.correctPassword(password, guest.password);
-
+        console.log(guest)
         if(!guest || !(await guest.correctPassword(password, guest.password))){
             return next(new Error ("Incorrect email or password!"))
         }
         
         //3.if everything ok send token to client
-        const token = signToken(guest._id);
-        res.status(201).json({message: "Login successfully", token})
+        createSendToken(guest, 201, res)
+
+        // const token = signToken(guest._id);
+        // res.status(201).json({message: "Login successfully", token})
     }catch (err) {
         console.error('registerGuest error:', err);
         res.status(500).json({ message: err.message });
@@ -86,3 +136,87 @@ exports.protect = async (req,res,next) => {
     }  
 }
 
+
+//ADMIN AUTH
+
+//new admin signup(create)
+exports.registerAdmin = async (req, res) => { 
+    try {
+        const { userName, email, password, hotelName, hotelAddress } = req.body;  
+        const existingAdmin = await AdminUser.findOne({ email });
+        if (existingAdmin) {
+            return res.status(400).json({ error: 'Email already in use' });
+        }   
+        const newAdmin = await AdminUser.create({ userName, email, password, hotelName, hotelAddress });
+        //jwt
+        createAdminSendToken(newAdmin, 201, res);
+        // const token = signToken(newAdmin._id);
+       
+        // res.status(201).json({ message: 'Admin registered successfully',token, newAdmin });
+    } catch (err) {
+        console.error('registerAdmin error:', err);
+        res.status(500).json({ message: err.message });
+    }       
+};
+
+//login Admin 
+exports.loginAdmin = async (req,res,next)=>{
+  try{
+    const { email, password } = req.body;  
+
+    if(!email || !password){
+      return next(new Error("please provide email and password!"));
+    }
+  
+    const admin = await AdminUser.findOne({email}).select('+password');
+
+
+    if(!admin){
+      return res.status(401).json({ message: "Admin is not valid" });
+    }
+
+    const correct = await admin.correctPassword(password, admin.password);
+
+    if(!correct){
+      return next(new Error("Incorrect email or password!"));
+    }
+
+    createAdminSendToken(admin,201,res);
+  }
+  catch (err) {
+    console.error('loginAdmin error:', err);
+    res.status(500).json({ message: err.message });
+  }
+}
+
+
+//Protect
+exports.protect = async (req,res,next) => {
+    try{
+    let AdminToken;
+        //1. getting token and check of its there
+    if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
+         AdminToken = req.headers.authorization.split(' ')[1];
+    }
+    if(!AdminToken){
+        return next(new Error('You are not Logged in ! Please Logged in to get access'))
+    }
+        //2. verification token
+    const adminDecoded = await promisify(jwt.verify)(AdminToken, process.env.JWT_SECRET)
+    
+        //3. check if user still exists
+    const currentAdmin = await AdminUser.findById(adminDecoded.id);
+    if(!currentAdmin){
+        return next(new Error("The Admin belongings to this token is no longer exists!"))
+    }
+        //4. check if user changed password after the token was issued
+
+    //Grant Access to protected Route
+    req.admin = currentAdmin;
+    next();
+
+    }catch (err) {
+        console.error('registerAdmin error:', err);
+        res.status(500).json({ message: err.message });
+    }  
+}

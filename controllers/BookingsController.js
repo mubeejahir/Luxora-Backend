@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
-const Bookings = require("../models/bookingsModel")
+const Bookings = require("../models/bookingsModel");
+const Room = require("../models/HotelDetailsModel");
 const {cleanInput} = require("../utils/helper")
 
 exports.createBooking = async (req, res) => {
@@ -135,3 +136,19 @@ exports.getAllBookings = async (req, res) => {
 	}
 }
 
+
+
+//stripe
+exports.stripePayment = async (req,res) =>{
+	try{
+		const {bookingId} = req.body;
+		const booking = await Bookings.findById(bookingId);//booking model
+		const roomData = await Room.findById(booking.room).populate('hotel');
+		const totalPrice = booking.totalPrice;
+		const {origin}	= req.headers;	
+
+	}catch (err) {
+		console.error("Payment error:", err)
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
