@@ -32,4 +32,7 @@ router.get("/bookings", bookingsController.getAllBookings)
 //home routes
 router.get("/home/count", homeController.getBookingsCount)
 
+//stripe
+router.get("/stripe", )
+
 module.exports = router
