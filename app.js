@@ -5,22 +5,22 @@ const { stripeWebhooks } = require("./controllers/StripeWebHooks");
 
 const app = express();
 
-app.get("/", (req,res)=> res.send("Backend is running...!") )
-// ========== STRIPE WEBHOOK MUST COME FIRST ==========
+// -----------------------------------------------
+// 1) Stripe webhook MUST be registered FIRST
+// -----------------------------------------------
 app.post(
   "/api/stripe",
   express.raw({ type: "application/json" }),
   stripeWebhooks
 );
 
-// ========== THEN NORMAL BODY PARSERS ==========
-app.use(express.json());
+// -----------------------------------------------
+// 2) NOW load other middlewares
+// -----------------------------------------------
+app.use(express.json()); // ← does NOT affect webhook anymore
 app.use(express.urlencoded({ extended: true }));
-
-// ========== COOKIES ==========
 app.use(cookieParser());
 
-// ========== CORS ==========
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -28,11 +28,17 @@ app.use(
   })
 );
 
-// ========== NORMAL ROUTES ==========
+// -----------------------------------------------
+// 3) Normal routes
+// -----------------------------------------------
+app.get("/", (req, res) => res.send("Backend running!"));
+
 const routes = require("./routes/routes");
 app.use("/api", routes);
 
-// ========== ERROR HANDLER ==========
+// -----------------------------------------------
+// 4) Global error handler
+// -----------------------------------------------
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(500).json({ status: "error", message: err.message });
