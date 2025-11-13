@@ -5,6 +5,7 @@ const { stripeWebhooks } = require("./controllers/StripeWebHooks");
 
 const app = express();
 
+app.get("/", (req,res)=> res.send("Backend is running...!") )
 // ========== STRIPE WEBHOOK MUST COME FIRST ==========
 app.post(
   "/api/stripe",
