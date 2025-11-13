@@ -23,16 +23,18 @@ router.patch("/hotel/details", hotelDetailsController.updateHotelSettings)
 //get all room details for LP
 router.get("/hotel/allDetails/protect", authController.protect, hotelDetailsController.getAllRoomDetails) //todo: use this in LP hotelsection after authentication
 router.get("/hotel/allDetails", hotelDetailsController.getAllRoomDetails)
+router.get("/hotel/search", hotelDetailsController.searchHotels)
 
 //bookings routes
-router.post("/bookings/create", bookingsController.createBooking)
+router.post("/bookings/create",  authController.protect, bookingsController.createBooking)
 router.get("/bookings/id", bookingsController.getBookingById)
 router.get("/bookings", bookingsController.getAllBookings)
+router.get("/bookings/check-availability", bookingsController.checkRoomAvailability)
 
 //home routes
 router.get("/home/count", homeController.getBookingsCount)
 
 //stripe
-router.get("/stripe", )
+router.post("/stripe/checkout-session", authController.protect, bookingsController.getCheckOutSession)
 
 module.exports = router

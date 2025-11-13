@@ -11,30 +11,36 @@ const signToken = id =>{
 }
 
 //guest cookie 
-const createSendToken = (guest, statusCode, res)=> {
-    const token = signToken(guest._id); 
-const cookieOptions  = {
-    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
+const createSendToken =   (guest, statusCode, res) => {
+  const token =  signToken(guest._id);
+  
+  const isProduction = process.env.NODE_ENV === "production";
+
+  const cookieOptions = {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
+    ),
     httpOnly: true,
-}
-if(process.env.NODE_ENV === 'production') cookieOptions.secure = true;
-res.cookie('jwt', token, cookieOptions)
+    sameSite: isProduction ? "none" : "lax", // ✅ 'lax' works on localhost
+    secure: isProduction, // ✅ true only in production (HTTPS)
+  };
 
-//remove the password from the output
-guest.password = undefined;
 
-res.status(statusCode).json({
+  res.cookie("jwt", token, cookieOptions);
+  
+  guest.password = undefined;
+
+  res.status(statusCode).json({
     status: 'success',
     token,
-    role:"guest",
-    data:guest
-    
-})
-}
+    role: 'guest',
+    data: { guest },
+  });
+};
 
 //admin cookie
 const createAdminSendToken = (admin, statusCode, res)=> {
-    const token = signToken(admin._id); 
+    const token = signToken(admin); 
 const cookieOptions  = {
     expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
     httpOnly: true,
@@ -84,18 +90,15 @@ exports.loginGuest = async (req,res,next)=>{
         if(!email || !password){
             return next( new Error("please provide email and password!"))
         }
-//         const guests = await Guest.find();
-// console.log("ALL guests:", guests);
-        //2.check if user exists && password is correct
+
         const guest = await Guest.findOne({email}).select('+password');
-        // const correct = await guest.correctPassword(password, guest.password);
+
         console.log(guest)
         if(!guest || !(await guest.correctPassword(password, guest.password))){
             return next(new Error ("Incorrect email or password!"))
         }
-        
-        //3.if everything ok send token to client
-        createSendToken(guest, 201, res)
+    
+         createSendToken(guest, 201, res)
 
         // const token = signToken(guest._id);
         // res.status(201).json({message: "Login successfully", token})
@@ -106,36 +109,52 @@ exports.loginGuest = async (req,res,next)=>{
 }
 
 //Protect
-exports.protect = async (req,res,next) => {
-    try{
+exports.protect = async (req, res, next) => {
+  console.log("Protected Route");
+
+  try {
     let token;
-        //1. getting token and check of its there
-    if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
-         token = req.headers.authorization.split(' ')[1];
+console.log(req.cookies)
+    if (req.cookies && req.cookies.jwt) {
+      token = req.cookies.jwt;
+      // console.log(token)
     }
-    if(!token){
-        return next(new Error('You are not Logged in ! Please Logged in to get access'))
-    }
-        //2. verification token
-    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET)
-    
-        //3. check if user still exists
-    const currentGuest = await Guest.findById(decoded.id);
-    if(!currentGuest){
-        return next(new Error("The Guest belongings to this token is no longer exists!"))
-    }
-        //4. check if user changed password after the token was issued
 
-    //Grant Access to protected Route
-    req.guest = currentGuest;
+    if (!token) {
+      return res.status(401).json({
+        message: "You are not logged in. Please log in to get access.",
+      });
+    }
+
+    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+
+    // 5️⃣ Check if the token belongs to Guest or Admin
+    let user =
+      (await Guest.findById(decoded.id)) ||
+      (await AdminUser.findById(decoded.id));
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ message: "The user belonging to this token no longer exists." });
+    }
+
+    // 6️⃣ Attach user info to request
+    if (user instanceof Guest) {
+      req.guest = user;
+      req.role = "guest";
+    } else if (user instanceof AdminUser) {
+      req.admin = user;
+      req.role = "admin";
+    }
+
+    // 7️⃣ Continue to protected route
     next();
-
-    }catch (err) {
-        console.error('registerGuest error:', err);
-        res.status(500).json({ message: err.message });
-    }  
-}
-
+  } catch (err) {
+    console.error("Protect route error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
 
 //ADMIN AUTH
 
@@ -170,7 +189,7 @@ exports.loginAdmin = async (req,res,next)=>{
   
     const admin = await AdminUser.findOne({email}).select('+password');
 
-
+// console.log(admin);
     if(!admin){
       return res.status(401).json({ message: "Admin is not valid" });
     }
@@ -191,32 +210,32 @@ exports.loginAdmin = async (req,res,next)=>{
 
 
 //Protect
-exports.protect = async (req,res,next) => {
-    try{
-    let AdminToken;
-        //1. getting token and check of its there
-    if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
-         AdminToken = req.headers.authorization.split(' ')[1];
-    }
-    if(!AdminToken){
-        return next(new Error('You are not Logged in ! Please Logged in to get access'))
-    }
-        //2. verification token
-    const adminDecoded = await promisify(jwt.verify)(AdminToken, process.env.JWT_SECRET)
+// exports.adminProtect = async (req,res,next) => {
+//     try{
+//     let AdminToken;
+//         //1. getting token and check of its there
+//     if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
+//          AdminToken = req.headers.authorization.split(' ')[1];
+//     }
+//     if(!AdminToken){
+//         return next(new Error('You are not Logged in ! Please Logged in to get access'))
+//     }
+//         //2. verification token
+//     const adminDecoded = await promisify(jwt.verify)(AdminToken, process.env.JWT_SECRET)
     
-        //3. check if user still exists
-    const currentAdmin = await AdminUser.findById(adminDecoded.id);
-    if(!currentAdmin){
-        return next(new Error("The Admin belongings to this token is no longer exists!"))
-    }
-        //4. check if user changed password after the token was issued
+//         //3. check if user still exists
+//     const currentAdmin = await AdminUser.findById(adminDecoded.id);
+//     if(!currentAdmin){
+//         return next(new Error("The Admin belongings to this token is no longer exists!"))
+//     }
+//         //4. check if user changed password after the token was issued
 
-    //Grant Access to protected Route
-    req.admin = currentAdmin;
-    next();
+//     //Grant Access to protected Route
+//     req.admin = currentAdmin;
+//     next();
 
-    }catch (err) {
-        console.error('registerAdmin error:', err);
-        res.status(500).json({ message: err.message });
-    }  
-}
+//     }catch (err) {
+//         console.error('registerAdmin error:', err);
+//         res.status(500).json({ message: err.message });
+//     }  
+// }
