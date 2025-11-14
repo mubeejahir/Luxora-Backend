@@ -23,10 +23,11 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: "*",
+    origin: "https://luxora-hotel.netlify.app",
     credentials: true,
   })
 );
+
 
 // -----------------------------------------------
 // 3) Normal routes
