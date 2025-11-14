@@ -21,8 +21,8 @@ const createSendToken =   (guest, statusCode, res) => {
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
-    sameSite: isProduction ? "none" : "lax", // ✅ 'lax' works on localhost
-    secure: isProduction, // ✅ true only in production (HTTPS)
+    sameSite: isProduction ? "none" : "lax", 
+    secure: isProduction, 
   };
 
 
@@ -48,7 +48,7 @@ const cookieOptions  = {
 if(process.env.NODE_ENV === 'production') cookieOptions.secure = true;
 res.cookie('jwt', token, cookieOptions)
 
-//remove the password from the output
+
 admin.password = undefined;
 
 res.status(statusCode).json({
@@ -71,11 +71,9 @@ exports.registerGuest = async (req, res) => {
             return res.status(400).json({ error: 'Email already in use' });
         }   
         const newGuest = await Guest.create({ fullName, email, phone, password });
-        //jwt
-        // const token = signToken(newGuest._id);
+   
         createSendToken(newGuest, 201, res)
        
-        // res.status(201).json({ message: 'Guest registered successfully',token, newGuest });
     } catch (err) {
         console.error('registerGuest error:', err);
         res.status(500).json({ message: err.message });
@@ -86,7 +84,7 @@ exports.registerGuest = async (req, res) => {
 exports.loginGuest = async (req,res,next)=>{
     try{
         const { email, password } = req.body;  
-        //1.check if email and password exist
+      
         if(!email || !password){
             return next( new Error("please provide email and password!"))
         }
@@ -99,9 +97,6 @@ exports.loginGuest = async (req,res,next)=>{
         }
     
          createSendToken(guest, 201, res)
-
-        // const token = signToken(guest._id);
-        // res.status(201).json({message: "Login successfully", token})
     }catch (err) {
         console.error('registerGuest error:', err);
         res.status(500).json({ message: err.message });
@@ -117,7 +112,7 @@ exports.protect = async (req, res, next) => {
 console.log(req.cookies)
     if (req.cookies && req.cookies.jwt) {
       token = req.cookies.jwt;
-      // console.log(token)
+    
     }
 
     if (!token) {
@@ -128,7 +123,7 @@ console.log(req.cookies)
 
     const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
-    // 5️⃣ Check if the token belongs to Guest or Admin
+   
     let user =
       (await Guest.findById(decoded.id)) ||
       (await AdminUser.findById(decoded.id));
@@ -139,7 +134,7 @@ console.log(req.cookies)
         .json({ message: "The user belonging to this token no longer exists." });
     }
 
-    // 6️⃣ Attach user info to request
+ 
     if (user instanceof Guest) {
       req.guest = user;
       req.role = "guest";
@@ -148,7 +143,7 @@ console.log(req.cookies)
       req.role = "admin";
     }
 
-    // 7️⃣ Continue to protected route
+   
     next();
   } catch (err) {
     console.error("Protect route error:", err);
@@ -167,11 +162,8 @@ exports.registerAdmin = async (req, res) => {
             return res.status(400).json({ error: 'Email already in use' });
         }   
         const newAdmin = await AdminUser.create({ userName, email, password, hotelName, hotelAddress });
-        //jwt
+      
         createAdminSendToken(newAdmin, 201, res);
-        // const token = signToken(newAdmin._id);
-       
-        // res.status(201).json({ message: 'Admin registered successfully',token, newAdmin });
     } catch (err) {
         console.error('registerAdmin error:', err);
         res.status(500).json({ message: err.message });
@@ -189,7 +181,7 @@ exports.loginAdmin = async (req,res,next)=>{
   
     const admin = await AdminUser.findOne({email}).select('+password');
 
-// console.log(admin);
+
     if(!admin){
       return res.status(401).json({ message: "Admin is not valid" });
     }
@@ -208,34 +200,3 @@ exports.loginAdmin = async (req,res,next)=>{
   }
 }
 
-
-//Protect
-// exports.adminProtect = async (req,res,next) => {
-//     try{
-//     let AdminToken;
-//         //1. getting token and check of its there
-//     if(req.headers.authorization && req.headers.authorization.startsWith('Bearer')){
-//          AdminToken = req.headers.authorization.split(' ')[1];
-//     }
-//     if(!AdminToken){
-//         return next(new Error('You are not Logged in ! Please Logged in to get access'))
-//     }
-//         //2. verification token
-//     const adminDecoded = await promisify(jwt.verify)(AdminToken, process.env.JWT_SECRET)
-    
-//         //3. check if user still exists
-//     const currentAdmin = await AdminUser.findById(adminDecoded.id);
-//     if(!currentAdmin){
-//         return next(new Error("The Admin belongings to this token is no longer exists!"))
-//     }
-//         //4. check if user changed password after the token was issued
-
-//     //Grant Access to protected Route
-//     req.admin = currentAdmin;
-//     next();
-
-//     }catch (err) {
-//         console.error('registerAdmin error:', err);
-//         res.status(500).json({ message: err.message });
-//     }  
-// }

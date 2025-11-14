@@ -4,38 +4,7 @@ const Bookings = require("../models/bookingsModel")
 const HotelDetails = require("../models/HotelDetailsModel")
 const { cleanInput } = require("../utils/helper")
 const HotelDetailsModel = require("../models/HotelDetailsModel")
-//for postman
-// exports.createBooking = async (req, res) => {
-// 	try {
-// 		const {
-// 			adminObjId,
-// 			guestObjId,
-// 			roomId,
-// 			checkInDate,
-// 			checkOutDate,
-// 			numberOfGuests,
-// 			totalPrice,
-// 			bookingStatus,
-// 		} = req.body
-// 		const newBooking = await Bookings.create({
-// 			adminObjId,
-// 			guestObjId,
-// 			roomId,
-// 			checkInDate,
-// 			checkOutDate,
-// 			numberOfGuests,
-// 			totalPrice,
-// 			bookingStatus,
-// 		})
-// 		res.status(201).json({
-// 			message: "Booking created successfully",
-// 			bookingId: newBooking._id,
-// 		})
-// 	} catch (err) {
-// 		console.error("createBooking error:", err)
-// 		res.status(500).json({ message: err.message })
-// 	}
-// }
+
 
 exports.getBookingById = async (req, res) => {
 	try {
@@ -62,12 +31,11 @@ exports.getAllBookings = async (req, res) => {
 			return res.status(400).json({ error: "adminId or guestId is required" })
 		}
 
-		// Dynamic filter
 		let filter = {}
 		if (adminId) filter.adminObjId = new mongoose.Types.ObjectId(adminId)
 		if (guestId) filter.guestObjId = new mongoose.Types.ObjectId(guestId)
 
-		const bookings = await Bookings.aggregate([
+		const allBookings = await Bookings.aggregate([
 			{
 				$match: filter,
 			},
@@ -107,12 +75,17 @@ exports.getAllBookings = async (req, res) => {
 							$match: {
 								$expr: {
 									$eq: [
-										"$rooms.roomId",
-										"$$roomId",
+										{
+											$toString: "$rooms.roomId",
+										},
+										{
+											$toString: "$$roomId",
+										},
 									],
 								},
 							},
 						},
+
 						{
 							$project: {
 								_id: 0,
@@ -134,6 +107,7 @@ exports.getAllBookings = async (req, res) => {
 					hotelAddress: {
 						$arrayElemAt: ["$roomDetails.hotelAddress", 0],
 					},
+					photos: { $arrayElemAt: ["$roomDetails.photos", 0] },
 				},
 			},
 
@@ -176,6 +150,17 @@ exports.getAllBookings = async (req, res) => {
 			{ $limit: limit },
 		])
 
+		
+		const bookings= allBookings.map((data) => {
+			if (data.photos && Array.isArray(data.photos)) {
+				data.photos = data.photos.map((file) => ({
+					path: file.path.replace(/\\/g, "/"),
+					contentType: file.mimetype,
+				}))
+			}
+			return data
+		})
+
 		res.json({
 			message: "Bookings retrieved successfully",
 			bookings,
@@ -204,7 +189,7 @@ exports.checkRoomAvailability = async (req, res) => {
 				.json({ error: "Check-out date must be after check-in date" })
 		}
 
-		// ✅ Step 1: Find the specific room
+	
 		const hotel = await HotelDetails.findOne(
 			{ "rooms.roomId": roomId },
 			{ "rooms.$": 1 }
@@ -216,7 +201,6 @@ exports.checkRoomAvailability = async (req, res) => {
 
 		const room = hotel.rooms[0]
 
-		// ✅ Step 2: Check if the room is marked as available in HotelDetails
 		if (!room.isAvailable) {
 			return res.status(200).json({
 				available: false,
@@ -224,7 +208,7 @@ exports.checkRoomAvailability = async (req, res) => {
 			})
 		}
 
-		// ✅ Step 3: Check guest capacity
+	
 		if (parseInt(numberOfGuests) > room.details.numberOfGuests) {
 			return res.status(400).json({
 				available: false,
@@ -232,7 +216,6 @@ exports.checkRoomAvailability = async (req, res) => {
 			})
 		}
 
-		// ✅ Step 4: Check if there’s an overlapping booking
 		const overlappingBooking = await Bookings.findOne({
 			roomId,
 			bookingStatus: { $in: ["booked", "checked-in"] },
@@ -244,7 +227,6 @@ exports.checkRoomAvailability = async (req, res) => {
 			],
 		})
 
-		// ✅ Step 5: Final availability response
 		if (overlappingBooking) {
 			return res.status(200).json({
 				available: false,
@@ -294,12 +276,12 @@ exports.createBooking = async (req, res) => {
 			})
 		}
 
-		// Convert admin ID safely
+		
 		const adminId = mongoose.Types.ObjectId.isValid(adminObjId)
 			? new mongoose.Types.ObjectId(adminObjId)
 			: adminObjId
 
-		// Convert dates
+	
 		const checkIn = new Date(checkInDate)
 		const checkOut = new Date(checkOutDate)
 
@@ -313,10 +295,10 @@ exports.createBooking = async (req, res) => {
 		console.log("Converted adminObjId:", adminId)
 		console.log("Incoming roomId:", roomId)
 
-		// Find hotel and room (roomId is STRING)
+	
 		const hotel = await HotelDetails.findOne({
 			adminObjId: adminId,
-			"rooms.roomId": roomId, // match as string
+			"rooms.roomId": roomId, 
 		})
 
 		if (!hotel) {
@@ -325,7 +307,7 @@ exports.createBooking = async (req, res) => {
 			})
 		}
 
-		// Find room inside hotel
+		
 		const room = hotel.rooms.find((r) => r.roomId === roomId)
 
 		if (!room || !room.isAvailable) {
@@ -334,7 +316,7 @@ exports.createBooking = async (req, res) => {
 			})
 		}
 
-		// Check overlapping bookings
+	
 		const overlappingBooking = await Bookings.findOne({
 			roomId,
 			bookingStatus: { $ne: "cancelled" },
@@ -348,7 +330,7 @@ exports.createBooking = async (req, res) => {
 			})
 		}
 
-		// Create booking
+		
 		const newBooking = await Bookings.create({
 			adminObjId: adminId,
 			guestObjId,
@@ -361,7 +343,7 @@ exports.createBooking = async (req, res) => {
 			isPaid: false,
 		})
 
-		// Update room availability
+	
 		await HotelDetails.updateOne(
 			{ "rooms.roomId": roomId },
 			{ $set: { "rooms.$.isAvailable": false } }
@@ -381,89 +363,77 @@ exports.createBooking = async (req, res) => {
 
 //delete bookings
 exports.deleteBooking = async (req, res) => {
-  try {
-    const { bookingId } = req.query;
+	try {
+		const { bookingId } = req.query
 
-    if (!bookingId) {
-      return res.status(400).json({ error: "bookingId is required" });
-    }
+		if (!bookingId) {
+			return res.status(400).json({ error: "bookingId is required" })
+		}
 
-    const deletedBooking = await Bookings.findByIdAndDelete(bookingId);
+		const deletedBooking = await Bookings.findByIdAndDelete(bookingId)
 
-    if (!deletedBooking) {
-      return res.status(404).json({ error: "Booking not found" });
-    }
+		if (!deletedBooking) {
+			return res.status(404).json({ error: "Booking not found" })
+		}
 
-    res.json({
-      message: "Booking deleted successfully",
-      deletedBooking,
-    });
-  } catch (err) {
-    console.error("deleteBooking error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
-
+		res.json({
+			message: "Booking deleted successfully",
+			deletedBooking,
+		})
+	} catch (err) {
+		console.error("deleteBooking error:", err)
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
 
 //stripe
 exports.getCheckOutSession = async (req, res) => {
-  try {
-    const { bookingId } = req.body;
+	try {
+		const { bookingId } = req.body
 
-    const booking = await Bookings.findById(bookingId);
-    if (!booking) throw new Error("Booking not found");
+		const booking = await Bookings.findById(bookingId)
+		if (!booking) throw new Error("Booking not found")
 
-    const roomId = booking.roomId;
+		const roomId = booking.roomId
 
-    const hotelWithRoom = await HotelDetailsModel.findOne({
-      "rooms.roomId": roomId,
-    });
-    if (!hotelWithRoom) throw new Error("Hotel not found for this room");
+		const hotelWithRoom = await HotelDetailsModel.findOne({
+			"rooms.roomId": roomId,
+		})
+		if (!hotelWithRoom) throw new Error("Hotel not found for this room")
 
-    const roomData = hotelWithRoom.rooms.find(r => r.roomId === roomId);
+		const roomData = hotelWithRoom.rooms.find((r) => r.roomId === roomId)
 
-    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+		const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-    const session = await stripeInstance.checkout.sessions.create({
-      payment_method_types: ["card"],  // <-- IMPORTANT
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "inr",
-            product_data: { name: roomData.roomName },
-            unit_amount: booking.totalPrice * 100,
-          },
-          quantity: 1,
-        },
-      ],
+		const session = await stripeInstance.checkout.sessions.create({
+			payment_method_types: ["card"], 
+			mode: "payment",
+			line_items: [
+				{
+					price_data: {
+						currency: "inr",
+						product_data: { name: roomData.roomName },
+						unit_amount: booking.totalPrice * 100,
+					},
+					quantity: 1,
+				},
+			],
 
-      metadata: {
-        bookingId: bookingId.toString(), // <-- THIS MUST WORK NOW
-      },
+			metadata: {
+				bookingId: bookingId.toString(), 
+			},
 
-      success_url: `${req.headers.origin}/loader/bookings`,
-      cancel_url: `${req.headers.origin}/bookings`,
-    });
+			success_url: `${req.headers.origin}/loader/bookings`,
+			cancel_url: `${req.headers.origin}/bookings`,
+		})
 
-    // Debug: See if metadata is actually added
-    console.log("Created session metadata:", session.metadata);
+	
+		console.log("Created session metadata:", session.metadata)
 
-    res.json({ success: true, url: session.url });
+		res.json({ success: true, url: session.url })
+	} catch (err) {
+		console.error("Payment error:", err)
+		res.json({ success: false, message: err.message })
+	}
+}
 
-  } catch (err) {
-    console.error("Payment error:", err);
-    res.json({ success: false, message: err.message });
-  }
-};
-
-
-// exports.getCheckOutSession = async (req,res) =>{
-// 	//1. get the currently booked tour
-// 	const {bookingId} = req.query;
-// 	const booking = await Bookings.findById(bookingId)
-
-// 	//2.create checkout session
-// 	stripe.checkout.session.create
-// 	//3.create session as response
-// }

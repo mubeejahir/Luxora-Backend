@@ -9,8 +9,8 @@ const HotelDetailsSchema = new mongoose.Schema({
 			roomName: { type: String, required: true },
 			photos: [
 				{
-					data: Buffer,
-					contentType: String,
+					path: { type: String, required: false }, 
+					contentType: { type: String, required: true }, 
 				},
 			],
 			description: { type: String, required: true },

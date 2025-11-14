@@ -20,10 +20,9 @@ app.post(
 app.use(express.json()); // ← does NOT affect webhook anymore
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
 app.use(
   cors({
-    origin: "https://luxora-hotel.netlify.app",
+    origin: "http://localhost:5174",
     credentials: true,
   })
 );
@@ -36,6 +35,7 @@ app.get("/", (req, res) => res.send("Backend running!"));
 
 const routes = require("./routes/routes");
 app.use("/api", routes);
+app.use("/uploads", express.static("uploads"));
 
 // -----------------------------------------------
 // 4) Global error handler

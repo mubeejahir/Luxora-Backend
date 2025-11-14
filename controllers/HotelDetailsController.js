@@ -19,60 +19,56 @@ exports.postData = async (req, res) => {
 
 // post hotel details from cabin
 exports.postHotelDetails = async (req, res) => {
-  try {
-    console.log("BODY:", req.body);
-    console.log("FILES:", req.files);
+	try {
+		console.log("BODY:", req.body)
+		console.log("FILES:", req.files)
 
-    const {
-      adminObjId,
-      roomName,
-      description,
-      pricePerNight,
-      guest,
-      bed,
-      bath,
-      amenities,
-    } = req.body;
+		const {
+			adminObjId,
+			roomName,
+			description,
+			pricePerNight,
+			guest,
+			bed,
+			bath,
+			amenities,
+		} = req.body
 
-    const hotel = await HotelDetails.findOne({ adminObjId });
-    if (!hotel) {
-      return res.status(404).json({ error: "Hotel not found for this admin" });
-    }
+		const hotel = await HotelDetails.findOne({ adminObjId })
+		if (!hotel) {
+			return res.status(404).json({ error: "Hotel not found for this admin" })
+		}
 
-    // Handle images from memory storage
-    const images = req.files?.map((file) => ({
-      data: file.buffer.toString("base64"),
-      contentType: file.mimetype,
-    })) || [];
+		const photos = req.files.map((file) => ({
+			path: file.path.replace(/\\/g, "/"),
+			contentType: file.mimetype,
+		}))
 
-    // Build new room object
-    const newRoom = {
-      roomName,
-      description,
-      pricePerNight,
-      amenities: Array.isArray(amenities) ? amenities : [amenities],
-      details: {
-        numberOfGuests: guest,
-        numberOfBeds: bed,
-        numberOfBathrooms: bath,
-      },
-      photos: images,
-    };
+		const newRoom = {
+			roomName,
+			description,
+			pricePerNight,
+			amenities: Array.isArray(amenities) ? amenities : [amenities],
+			details: {
+				numberOfGuests: guest,
+				numberOfBeds: bed,
+				numberOfBathrooms: bath,
+			},
+			photos,
+		}
 
-    hotel.rooms.push(newRoom);
-    await hotel.save();
+		hotel.rooms.push(newRoom)
+		await hotel.save()
 
-    res.status(201).json({
-      message: "Room added successfully",
-      room: newRoom,
-    });
-
-  } catch (err) {
-    console.error("postHotelDetails error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
-
+		res.status(201).json({
+			message: "Room added successfully",
+			room: newRoom,
+		})
+	} catch (err) {
+		console.error("postHotelDetails error:", err)
+		res.status(500).json({ error: "Internal server error" })
+	}
+}
 
 // get hotel details by admin ID
 exports.getHotelDetailsByAdminId = async (req, res) => {
@@ -116,7 +112,6 @@ exports.deleteHotelRoom = async (req, res) => {
 			return res.status(404).json({ error: "Room not found" })
 		}
 
-		// Remove this room
 		await HotelDetails.updateOne(
 			{ "rooms.roomId": roomId },
 			{ $pull: { rooms: { roomId } } }
@@ -139,7 +134,6 @@ exports.editHotelRoom = async (req, res) => {
 			return res.status(400).json({ error: "roomId is required" })
 		}
 
-		// Find the hotel containing this room
 		const hotel = await HotelDetails.findOne({
 			rooms: { $elemMatch: { roomId } },
 		})
@@ -148,14 +142,12 @@ exports.editHotelRoom = async (req, res) => {
 			return res.status(404).json({ error: "Room not found" })
 		}
 
-		// Find the exact room object
 		const roomIndex = hotel.rooms.findIndex((r) => r.roomId === roomId)
 
 		if (roomIndex === -1) {
 			return res.status(404).json({ error: "Room not found inside hotel" })
 		}
 
-		// Merge existing room with updated data
 		const updatedRoom = {
 			...hotel.rooms[roomIndex].toObject(),
 			...updatedData,
@@ -165,7 +157,6 @@ exports.editHotelRoom = async (req, res) => {
 			},
 		}
 
-		// Update room in array
 		hotel.rooms[roomIndex] = updatedRoom
 
 		await hotel.save()
@@ -198,7 +189,7 @@ exports.updateHotelSettings = async (req, res) => {
 				.status(404)
 				.json({ error: "setting is not found for this admin" })
 		}
-		// return the updated document along with a message
+
 		res.json({ message: "Settings updated successfully", hotel: updateSetting })
 	} catch (err) {
 		console.error("updating the hotel setting error:", err)
@@ -214,16 +205,11 @@ exports.searchHotels = async (req, res) => {
 		const limit = parseInt(req.query.limit) || 10
 		const skip = (page - 1) * limit
 
-		// console.log(destination)
-
-		// Step 1: Build filter
 		const matchStage = destination
 			? { "adminData.hotelAddress": { $regex: new RegExp(destination, "i") } }
 			: {}
 
-		// Step 2: Aggregate to fetch rooms by destination
 		const rooms = await HotelDetails.aggregate([
-			// Join with AdminUser to access hotel details
 			{
 				$lookup: {
 					from: "adminusers",
@@ -234,23 +220,19 @@ exports.searchHotels = async (req, res) => {
 			},
 			{ $unwind: "$adminData" },
 
-			// Apply destination filter
 			{ $match: matchStage },
 
-			// Unwind rooms array to get individual room documents
 			{ $unwind: "$rooms" },
 
-			// Sort (optional)
 			{ $sort: { "rooms.roomName": 1 } },
 
-			// Pagination
 			{ $skip: skip },
 			{ $limit: limit },
 
-			// Select only the needed fields
 			{
 				$project: {
 					_id: 0,
+					adminObjId: "$adminObjId",
 					roomId: "$rooms.roomId",
 					roomName: "$rooms.roomName",
 					description: "$rooms.description",
@@ -264,7 +246,6 @@ exports.searchHotels = async (req, res) => {
 			},
 		])
 
-		// Step 3: Count total rooms (for pagination)
 		const totalCountPipeline = [
 			{
 				$lookup: {
@@ -283,7 +264,6 @@ exports.searchHotels = async (req, res) => {
 		const totalResult = await HotelDetails.aggregate(totalCountPipeline)
 		const totalRooms = totalResult[0]?.totalRooms || 0
 
-		// Step 4: Send response
 		if (!rooms.length) {
 			return res.status(404).json({ message: "No rooms found" })
 		}
