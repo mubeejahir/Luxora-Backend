@@ -1,5 +1,6 @@
 const express = require("express")
 const router = express.Router()
+const uploadMemory = require("../middlewares/uploadMemory");
 const guestController = require("../controllers/GuestController")
 const hotelDetailsController = require("../controllers/HotelDetailsController")
 const bookingsController = require("../controllers/BookingsController")
@@ -17,9 +18,11 @@ router.post("/admin/login", authController.loginAdmin)
 
 //hotel details routes
 router.post("/hotel/data", hotelDetailsController.postData)
-router.post("/hotel/details", hotelDetailsController.postHotelDetails)
+router.post("/hotel/details",uploadMemory.array("photos", 1), hotelDetailsController.postHotelDetails)
 router.get("/hotel/details", hotelDetailsController.getHotelDetailsByAdminId)
 router.patch("/hotel/details", hotelDetailsController.updateHotelSettings)
+router.delete("/hotel/delete", hotelDetailsController.deleteHotelRoom)
+router.put("/hotel/edit", hotelDetailsController.editHotelRoom)
 //get all room details for LP
 router.get("/hotel/allDetails/protect", authController.protect, hotelDetailsController.getAllRoomDetails) //todo: use this in LP hotelsection after authentication
 router.get("/hotel/allDetails", hotelDetailsController.getAllRoomDetails)
@@ -27,6 +30,7 @@ router.get("/hotel/search", hotelDetailsController.searchHotels)
 
 //bookings routes
 router.post("/bookings/create",  authController.protect, bookingsController.createBooking)
+router.delete("/bookings/delete", bookingsController.deleteBooking)
 router.get("/bookings/id", bookingsController.getBookingById)
 router.get("/bookings", bookingsController.getAllBookings)
 router.get("/bookings/check-availability", bookingsController.checkRoomAvailability)

@@ -119,6 +119,7 @@ exports.getAllBookings = async (req, res) => {
 								roomName: "$rooms.roomName",
 								hotelName: "$hotelName",
 								hotelAddress: "$hotelAddress",
+								photos: "$rooms.photos",
 							},
 						},
 					],
@@ -157,6 +158,7 @@ exports.getAllBookings = async (req, res) => {
 					guestName: "$guestDetails.fullName",
 					roomName: 1,
 					hotelName: 1,
+					photos: 1,
 					hotelAddress: 1,
 					checkInDate: 1,
 					checkOutDate: 1,
@@ -377,45 +379,33 @@ exports.createBooking = async (req, res) => {
 	}
 }
 
+//delete bookings
+exports.deleteBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.query;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: "bookingId is required" });
+    }
+
+    const deletedBooking = await Bookings.findByIdAndDelete(bookingId);
+
+    if (!deletedBooking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    res.json({
+      message: "Booking deleted successfully",
+      deletedBooking,
+    });
+  } catch (err) {
+    console.error("deleteBooking error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
 //stripe
-// exports.getCheckOutSession = async (req,res) =>{
-// 	try{
-// 		const {bookingId} = req.body;
-// 		const booking = await Bookings.findById(bookingId);//booking model
-// 		const roomData = await HotelDetailsModel.findById(booking.roomId).populate('hotel');//room Id
-// 		const totalPrice = booking.totalPrice;
-// 		// const {origin}	= req.headers;
-
-// 		const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
-// 		const line_items = [
-// 			{
-// 				price_data: {
-// 					currency : "inr",
-// 					product_data: {
-// 						name:roomData.hotel.name, //roomName
-// 					},
-// 					unit_amount: totalPrice * 100
-// 				},
-// 				quantity: 1,
-// 			}
-// 		]
-// 		//create checkout session
-// 		const session = await stripeInstance.checkout.sessions.create({
-// 			line_items,
-// 			mode: "payment",
-// 			success_url: `${origin}/loader/bookings`,
-// 			cancel_url: `${origin}/bookings`,
-// 			metadata: {
-// 				bookingId
-// 			}
-// 		})
-// 		res.json({success: true, url: session.url})
-
-// 	}catch (err) {
-// 		console.error("Payment error:", err)
-// 		res.json({success: false, message: "payment Failed"})
-// 	}
-// }
 exports.getCheckOutSession = async (req, res) => {
   try {
     const { bookingId } = req.body;

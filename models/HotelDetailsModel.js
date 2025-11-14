@@ -7,7 +7,12 @@ const HotelDetailsSchema = new mongoose.Schema({
 		{
 			roomId: { type: String, default: uuidv4, unique: true },
 			roomName: { type: String, required: true },
-			photos: {},
+			photos: [
+				{
+					data: Buffer,
+					contentType: String,
+				},
+			],
 			description: { type: String, required: true },
 			details: {
 				numberOfGuests: { type: Number, required: true },
