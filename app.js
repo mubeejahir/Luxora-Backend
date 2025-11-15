@@ -12,7 +12,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 app.use(
 	cors({
-		origin: "https://luxora-hotel.netlify.app",
+		origin: process.env.ALLOWED_ORIGIN,
 		credentials: true,
 	})
 )
